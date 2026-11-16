@@ -161,52 +161,75 @@ function rsi(a,n=14){const o=[null];let g=0,l=0;for(let i=1;i<a.length;i++){cons
 function atr(s){const S=agg(M[s].c.slice(-90),5).slice(-15);if(S.length<3)return M[s].last*.001;let t=0;
   for(let i=1;i<S.length;i++)t+=Math.max(S[i][2]-S[i][3],Math.abs(S[i][2]-S[i-1][4]),Math.abs(S[i][3]-S[i-1][4]));return t/(S.length-1)||M[s].last*.001}
 
+/* ---------- Symbole ---------- */
+const IC={'BTC/USD':['₿','#f7931a'],'ETH/USD':['Ξ','#6f7cf7'],'SOL/USD':['S','#9b5cf6'],'XRP/USD':['X','#2a9fd6'],
+ 'EUR/USD':['€$','#2f6fd6'],'GBP/USD':['£$','#a8484f'],'USD/JPY':['$¥','#c9485b'],'USD/CHF':['$Fr','#d64545'],'AUD/USD':['A$','#2e8b6a'],'EUR/GBP':['€£','#5a67c9'],
+ 'GOLD':['Au','#d4a017'],'SILBER':['Ag','#8e9aaf'],'WTI':['WTI','#2b2f3a'],'BRENT':['BRT','#5a4a3a'],'ERDGAS':['Gas','#3a8fb7'],'KUPFER':['Cu','#b8733a'],
+ 'DAX':['DAX','#2b4fa8'],'S&P 500':['500','#b03a48'],'NASDAQ':['100','#1f8fa8'],'DOW':['30','#3d6fb0'],
+ 'AAPL':['AAPL','#5b6274'],'TSLA':['TSLA','#c0392b'],'NVDA':['NVDA','#5d9c1f'],'SAP':['SAP','#1b74c5']};
+const ico=s=>{const [t,c]=IC[s];return`<span class="ico n${t.length}" style="--c:${c}">${t}</span>`};
+const eur0=x=>nf(x,x%1?2:0)+' €';
+const posOf=s=>A.pos.filter(p=>p.s===s);
+const sumPl=ps=>ps.reduce((a,p)=>a+pnl(p),0),sumMg=ps=>ps.reduce((a,p)=>a+p.margin,0);
+
 /* ---------- Chart ---------- */
-let colC=null,colT=0;
-function colors(){if(!colC||Date.now()-colT>1500){const cs=getComputedStyle(document.documentElement),g=n=>cs.getPropertyValue(n).trim();
-  colC={fg:g('--fg'),mute:g('--mute'),line:g('--line'),up:g('--up'),dn:g('--dn'),acc:g('--acc'),surf:g('--surf'),bg:g('--bg')};colT=Date.now()}return colC}
+const cssv=getComputedStyle(document.documentElement),tok=n=>cssv.getPropertyValue(n).trim();
+const C={fg:tok('--fg'),mute:tok('--mute'),line:tok('--line'),up:tok('--up'),dn:tok('--dn'),acc:tok('--acc'),ink:tok('--ink'),warn:tok('--warn')};
+const FF='"Fira Sans",system-ui,sans-serif';
 function draw(){
   const cv=$('#chart'),bx=cv.parentElement.getBoundingClientRect();if(bx.width<20||bx.height<20)return;
   const dpr=window.devicePixelRatio||1,W=bx.width,H=bx.height;
   if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}
   const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
-  const C=colors(),ins=I[sel],S=candles(sel,TF),ax=64,tH=18,rH=ind.rsi?Math.round(H*.2):0,pH=H-tH-rH,sim=!M[sel].live;
+  const ins=I[sel],S=candles(sel,TF),ax=66,tH=22,rH=ind.rsi?Math.round(H*.2):0,pH=H-tH-rH,sim=!M[sel].live,ps=posOf(sel);
   g.textBaseline='middle';
-  if(sim){g.font='700 34px "Bricolage Grotesque",system-ui,sans-serif';g.textAlign='center';g.fillStyle=C.fg;g.globalAlpha=.07;g.fillText('SIMULIERT',(W-ax)/2,pH/2);g.globalAlpha=1}
-  if(S.length<2){geo=null;g.font='500 13px Inter,system-ui,sans-serif';g.textAlign='center';g.fillStyle=C.mute;
+  if(sim){g.font='700 34px '+FF;g.textAlign='center';g.fillStyle=C.fg;g.globalAlpha=.08;g.fillText('SIMULIERT',(W-ax)/2,pH/2);g.globalAlpha=1}
+  if(S.length<2){geo=null;g.font='500 13px '+FF;g.textAlign='center';g.fillStyle=C.mute;
     g.fillText(M[sel].ready?'Der Chart baut sich aus den eintreffenden Kursen auf …':'Warte auf den ersten echten Kurs …',W/2,H/2);$('#ohlc').textContent='';$('#toLive').hidden=true;return}
-  const n=Math.min(zoom,S.length);off=Math.max(0,Math.min(off,S.length-n));const end=S.length-off,st=end-n,cw=(W-ax)/Math.max(n,20);
+  const n=Math.min(zoom,S.length);off=Math.max(0,Math.min(off,S.length-n));const end=S.length-off,st=end-n,cw=(W-ax-8)/Math.max(n,20);
   geo={cw,st,n,ax,W};
   const cl=S.map(k=>k[4]),bb=ind.bb?boll(cl):null;
   let lo=Infinity,hi=-Infinity;
   for(let i=st;i<end;i++){lo=Math.min(lo,S[i][3]);hi=Math.max(hi,S[i][2]);if(bb&&bb[i]){lo=Math.min(lo,bb[i][2]);hi=Math.max(hi,bb[i][0])}}
-  const pad=(hi-lo)*.1||hi*.0005;lo-=pad;hi+=pad;
-  const y=p=>(hi-p)/(hi-lo)*pH,x=i=>(i-st+.5)*cw,mono='500 10.5px "JetBrains Mono",ui-monospace,Menlo,monospace';
-  g.font=mono;g.lineWidth=1;
-  for(let k=0;k<5;k++){const p=lo+(hi-lo)*(k+.5)/5,yy=Math.round(y(p))+.5;g.strokeStyle=C.line;g.globalAlpha=.5;g.beginPath();g.moveTo(0,yy);g.lineTo(W-ax,yy);g.stroke();g.globalAlpha=1;
-    g.fillStyle=C.mute;g.textAlign='left';g.fillText(nf(p,ins.d),W-ax+6,yy)}
-  const step=Math.max(1,Math.ceil(Math.max(n,20)/4));g.textAlign='center';g.fillStyle=C.mute;
-  for(let i=st;i<end;i++)if((i-st)%step===(step>>1))g.fillText(hm(S[i][0]),x(i),H-tH/2);
+  if(off===0)for(const p of ps){const r=hi-lo||hi*.001;if(p.entry>lo-3*r&&p.entry<hi+3*r){lo=Math.min(lo,p.entry);hi=Math.max(hi,p.entry)}} // Einstieg bleibt sichtbar
+  const pad=(hi-lo)*.12||hi*.0005;lo-=pad;hi+=pad;
+  const top=44,y=p=>top+(hi-p)/(hi-lo)*(pH-top),x=i=>(i-st+.5)*cw,yr=p=>Math.round(y(p))+.5,nfont='500 12px '+FF;
+  const inR=p=>p>=lo&&p<=hi;
+  g.font=nfont;g.lineWidth=1;
+  for(let k=0;k<6;k++){const p=lo+(hi-lo)*(k+.5)/6,yy=yr(p);g.strokeStyle=C.line;g.globalAlpha=.45;g.beginPath();g.moveTo(0,yy);g.lineTo(W-ax,yy);g.stroke();g.globalAlpha=1;
+    g.fillStyle=C.mute;g.textAlign='left';g.fillText(nf(p,ins.d),W-ax+8,yy)}
+  const step=Math.max(1,Math.ceil(Math.max(n,20)/4));g.textAlign='center';
+  for(let i=st;i<end;i++)if((i-st)%step===(step>>1)){const xx=Math.round(x(i))+.5;g.strokeStyle=C.line;g.globalAlpha=.3;g.beginPath();g.moveTo(xx,0);g.lineTo(xx,pH+rH);g.stroke();g.globalAlpha=1;
+    g.fillStyle=C.mute;g.fillText(hm(S[i][0]),xx,H-tH/2)}
   if(bb){g.strokeStyle=C.mute;g.globalAlpha=.7;for(const j of [0,2]){g.beginPath();let f=1;for(let i=st;i<end;i++){if(!bb[i])continue;f?g.moveTo(x(i),y(bb[i][j])):g.lineTo(x(i),y(bb[i][j]));f=0}g.stroke()}g.globalAlpha=1}
-  const bw=Math.max(1,cw*.68);
+  const bw=Math.max(1,cw*.7);
   for(let i=st;i<end;i++){const k=S[i],u=k[4]>=k[1];g.fillStyle=g.strokeStyle=u?C.up:C.dn;const xx=x(i);
     g.beginPath();g.moveTo(Math.round(xx)+.5,y(k[2]));g.lineTo(Math.round(xx)+.5,y(k[3]));g.stroke();
     const y1=y(Math.max(k[1],k[4])),y2=y(Math.min(k[1],k[4]));g.fillRect(xx-bw/2,y1,bw,Math.max(1,y2-y1))}
-  if(ind.ema){[[9,C.acc],[21,C.fg]].forEach(([p,c])=>{const e=ema(cl,p);g.strokeStyle=c;g.lineWidth=1.3;g.globalAlpha=.9;g.beginPath();for(let i=st;i<end;i++)i===st?g.moveTo(x(i),y(e[i])):g.lineTo(x(i),y(e[i]));g.stroke();g.globalAlpha=1;g.lineWidth=1})}
-  const hl=(p,c,txt,dash)=>{if(p<lo||p>hi)return;const yy=Math.round(y(p))+.5;g.strokeStyle=c;g.setLineDash(dash||[]);g.beginPath();g.moveTo(0,yy);g.lineTo(W-ax,yy);g.stroke();g.setLineDash([]);
-    if(txt){g.font='600 10px Inter,system-ui,sans-serif';const w=g.measureText(txt).width+8;g.fillStyle=c;g.fillRect(4,yy-8,w,16);g.fillStyle=C.bg;g.textAlign='left';g.fillText(txt,8,yy+.5);g.font=mono}};
-  for(const p of A.pos)if(p.s===sel){hl(p.entry,C.acc,p.side>0?'Long':'Short');if(p.sl)hl(p.sl,C.dn,'SL',[4,3]);if(p.tp)hl(p.tp,C.up,'TP',[4,3])}
-  for(const o of A.ord)if(o.s===sel)hl(o.price,C.mute,'Order',[2,3]);
-  const lp=M[sel].last,ly=Math.round(y(lp))+.5,lk=S[S.length-1],lu=lk[4]>=lk[1];
-  if(lp>=lo&&lp<=hi){g.strokeStyle=lu?C.up:C.dn;g.setLineDash([2,2]);g.beginPath();g.moveTo(0,ly);g.lineTo(W-ax,ly);g.stroke();g.setLineDash([]);
-    g.fillStyle=lu?C.up:C.dn;g.fillRect(W-ax,ly-9,ax,18);g.fillStyle=C.bg;g.textAlign='left';g.fillText(nf(lp,ins.d),W-ax+6,ly)}
+  if(ind.ema){[[9,C.warn],[21,C.fg]].forEach(([p,c])=>{const e=ema(cl,p);g.strokeStyle=c;g.lineWidth=1.3;g.globalAlpha=.85;g.beginPath();for(let i=st;i<end;i++)i===st?g.moveTo(x(i),y(e[i])):g.lineTo(x(i),y(e[i]));g.stroke();g.globalAlpha=1;g.lineWidth=1})}
+  const hline=(yy,c,x0,dash)=>{g.strokeStyle=c;g.setLineDash(dash||[]);g.beginPath();g.moveTo(x0||0,yy);g.lineTo(W-ax,yy);g.stroke();g.setLineDash([])};
+  const parts=(pp,xl,yy,bg,fg)=>{let w=14;pp.forEach(([t,b])=>{g.font=(b?'700 ':'500 ')+'12px '+FF;w+=g.measureText(t).width+7});w-=7;
+    g.fillStyle=bg;g.fillRect(xl,yy-11,w,22);let xx=xl+7;g.fillStyle=fg;g.textAlign='left';pp.forEach(([t,b])=>{g.font=(b?'700 ':'500 ')+'12px '+FF;g.fillText(t,xx,yy+.5);xx+=g.measureText(t).width+7});return w};
+  const axb=(yy,p,bg,fg)=>{g.fillStyle=bg;g.fillRect(W-ax,yy-11,ax-3,22);g.fillStyle=fg;g.font='600 12px '+FF;g.textAlign='left';g.fillText(nf(p,ins.d),W-ax+8,yy+.5)};
+  for(const o of A.ord)if(o.s===sel&&inR(o.price)){const yy=yr(o.price);hline(yy,C.mute,0,[2,3]);parts([['Order',0]],0,yy,C.mute,C.ink);axb(yy,o.price,C.mute,C.ink)}
+  for(const p of ps){
+    if(p.sl&&inR(p.sl)){const yy=yr(p.sl);hline(yy,C.dn,0,[4,3]);parts([['Stop-Loss',1]],0,yy,C.dn,C.ink);axb(yy,p.sl,C.dn,C.ink)}
+    if(p.tp&&inR(p.tp)){const yy=yr(p.tp);hline(yy,C.up,0,[4,3]);parts([['Take-Profit',1]],0,yy,C.up,C.ink);axb(yy,p.tp,C.up,C.ink)}
+    if(inR(p.entry)){const yy=yr(p.entry);hline(yy,C.acc);parts([[(p.side>0?'KAUF':'VERKAUF')+' X'+p.lev,0],[eur0(p.margin),1]],0,yy,C.acc,C.ink);axb(yy,p.entry,C.acc,C.ink)}}
+  const lp=M[sel].last,lk=S[S.length-1];
+  if(inR(lp)){const ly=yr(lp);
+    if(ps.length){const gp=sumPl(ps),c=gp>=0?C.up:C.dn,tx=[[sgn(gp),0],[pct(gp/sumMg(ps)*100),1]];
+      g.font='500 12px '+FF;let w=14;tx.forEach(([t,b])=>{g.font=(b?'700 ':'500 ')+'12px '+FF;w+=g.measureText(t).width+7});w-=7;
+      const xl=Math.max(4,W-ax-56-w);parts(tx,xl,ly,c,C.ink);hline(ly,c,xl+w);axb(ly,lp,c,C.ink)}
+    else{const c=lk[4]>=lk[1]?C.up:C.dn;hline(ly,c,0,[2,2]);axb(ly,lp,c,C.ink)}}
+  g.font=nfont;
   if(rH){const r=rsi(cl),y0=pH,ry=v=>y0+4+(100-v)/100*(rH-8);g.strokeStyle=C.line;g.beginPath();g.moveTo(0,y0+.5);g.lineTo(W,y0+.5);g.stroke();
     g.globalAlpha=.5;[30,70].forEach(v=>{g.setLineDash([3,3]);g.beginPath();g.moveTo(0,ry(v));g.lineTo(W-ax,ry(v));g.stroke()});g.setLineDash([]);g.globalAlpha=1;
-    g.fillStyle=C.mute;g.textAlign='left';g.fillText('RSI 70',W-ax+6,ry(70));g.fillText('30',W-ax+6,ry(30));
-    g.strokeStyle=C.acc;g.lineWidth=1.3;g.beginPath();let f=1;for(let i=st;i<end;i++){if(r[i]==null)continue;f?g.moveTo(x(i),ry(r[i])):g.lineTo(x(i),ry(r[i]));f=0}g.stroke();g.lineWidth=1}
-  let k=lk;
-  if(cross!=null&&cross>=st&&cross<end){k=S[cross];const xx=Math.round(x(cross))+.5;g.strokeStyle=C.mute;g.setLineDash([3,3]);g.beginPath();g.moveTo(xx,0);g.lineTo(xx,pH+rH);g.stroke();g.setLineDash([])}
-  $('#ohlc').textContent=(cross!=null?hm(k[0])+'  ':'')+'O '+nf(k[1],ins.d)+'  H '+nf(k[2],ins.d)+'  L '+nf(k[3],ins.d)+'  C '+nf(k[4],ins.d);
+    g.fillStyle=C.mute;g.textAlign='left';g.fillText('RSI 70',W-ax+8,ry(70));g.fillText('30',W-ax+8,ry(30));
+    g.strokeStyle=C.warn;g.lineWidth=1.3;g.beginPath();let f=1;for(let i=st;i<end;i++){if(r[i]==null)continue;f?g.moveTo(x(i),ry(r[i])):g.lineTo(x(i),ry(r[i]));f=0}g.stroke();g.lineWidth=1}
+  let k=null;
+  if(cross!=null&&cross>=st&&cross<end){k=S[cross];const xx=Math.round(x(cross))+.5;g.strokeStyle=C.fg;g.globalAlpha=.6;g.setLineDash([3,3]);g.beginPath();g.moveTo(xx,0);g.lineTo(xx,pH+rH);g.stroke();g.setLineDash([]);g.globalAlpha=1}
+  $('#ohlc').textContent=k?hm(k[0])+' · O '+nf(k[1],ins.d)+' · H '+nf(k[2],ins.d)+' · L '+nf(k[3],ins.d)+' · C '+nf(k[4],ins.d):'';
   $('#toLive').hidden=off===0}
 (()=>{const cv=$('#chart');let d=null;
   cv.addEventListener('pointerdown',e=>{d={x:e.clientX,o:off,m:0};cv.setPointerCapture(e.pointerId)});
@@ -214,24 +237,52 @@ function draw(){
   const up=e=>{if(d&&!d.m&&geo){const r=cv.getBoundingClientRect(),i=geo.st+Math.floor((e.clientX-r.left)/geo.cw);cross=(cross===i||e.clientX-r.left>geo.W-geo.ax)?null:i;draw()}d=null};
   cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',()=>d=null)})();
 
-/* ---------- Ansichten ---------- */
+/* ---------- Handel ---------- */
+const TFL={1:'1m',5:'5m',15:'15m',60:'1h'};
+const setH=(el,h)=>{if(el.dataset.h!==h){el.innerHTML=h;el.dataset.h=h}};
 function chips(el,list,cur,act){el.innerHTML=list.map(([v,t,c])=>`<button class="chip ${c||''}" data-act="${act}" data-v="${v}" aria-pressed="${String(v)===String(cur)}">${t}</button>`).join('')}
+let sKey='',tool='';
+function liveStrip(){const key=sel+'|'+mVer+'|'+A.pos.map(p=>p.s).join();
+  if(key!==sKey){sKey=key;
+    $('#strip').innerHTML=INS.map(x=>`<button class="sbtn${M[x.s].live?'':' sim'}" data-act="pick" data-v="${x.s}" aria-pressed="${x.s===sel}" aria-label="${x.s}${M[x.s].live?'':' (simuliert)'}">${ico(x.s)}<i id="sb${x.i}" hidden></i></button>`).join('');
+    const e=$('#strip [aria-pressed="true"]'),st=$('#strip');if(e)st.scrollLeft=e.offsetLeft-st.clientWidth/2+21}
+  for(const x of INS){const ps=posOf(x.s),b=$('#sb'+x.i);b.hidden=!ps.length;if(ps.length){const up=sumPl(ps)>=0;b.className=up?'bu':'bd';b.textContent=up?'▲':'▼'}}}
+function buildTools(){const el=$('#tools');el.hidden=!tool;
+  [['tf','#tbTf'],['ind','#tbInd'],['set','#tbSet']].forEach(([k,q])=>$(q).setAttribute('aria-expanded',tool===k));
+  if(tool==='tf')chips(el,[[1,'1 Minute'],[5,'5 Minuten'],[15,'15 Minuten'],[60,'1 Stunde']],TF,'tf');
+  else if(tool==='ind')el.innerHTML=[['ema','EMA 9/21'],['bb','Bollinger-Bänder'],['rsi','RSI']].map(([v,t])=>`<button class="chip" data-act="ind" data-v="${v}" aria-pressed="${!!ind[v]}">${t}</button>`).join('');
+  else if(tool==='set')el.innerHTML=`<span>Zoom</span><button class="chip" data-act="zoom" data-v="1.4" aria-label="Herauszoomen">−</button><button class="chip" data-act="zoom" data-v="0.7" aria-label="Hineinzoomen">+</button>`+
+    (M[sel].live?'':'<span>Tempo der Simulation</span>'+[[0,'Pause'],[1,'Echtzeit'],[10,'10×'],[60,'60×']].map(([v,t])=>`<button class="chip" data-act="speed" data-v="${v}" aria-pressed="${v===speed}">${t}</button>`).join(''))}
+let bsKey='';
+function liveTrade(){liveStrip();const ok=known(sel),ch=dayCh(sel),ps=posOf(sel);
+  $('#tbSym').textContent=sel+' ▾';$('#tbTf').textContent=TFL[TF];
+  setH($('#cLabel'),`<b>${sel}</b>${stTag(sel)} <span class="${cls(ch)}">${ch==null?'':pct(ch)}</span><small>${srcTxt(sel)}</small>`);
+  const key=sel+'|'+(ps.length?1:0);
+  if(key!==bsKey){bsKey=key;$('#bs').innerHTML=ps.length
+    ?`<button class="b-stops" data-act="stops">Stops</button><button class="b-close" data-act="closeSel">Schließen<small id="bPl"></small></button>`
+    :`<button class="b-sell" data-act="ticket" data-v="-1">Verkaufen<small id="bBid"></small></button><button class="b-buy" data-act="ticket" data-v="1">Kaufen<small id="bAsk"></small></button>`}
+  if(ps.length)$('#bPl').textContent=sgn(sumPl(ps));
+  else{$('#bBid').textContent=ok?fp(sel,bid(sel)):'–';$('#bAsk').textContent=ok?fp(sel,ask(sel)):'–'}
+  const os=A.ord.filter(o=>o.s===sel),e=$('#ordstrip');e.hidden=!os.length;
+  if(os.length)setH(e,os.map(o=>`<span>${o.side>0?'Kauf':'Verkauf'}-${o.kind==='limit'?'Limit':'Stop'} wartet bei ${fp(sel,o.price)}</span><button class="btn sm" data-act="cancel" data-v="${o.id}">Löschen</button>`).join(''))}
+
+/* ---------- Märkte ---------- */
 let mBuilt=-1;
 function buildMarkets(){mBuilt=mVer;
   chips($('#filt'),[['alle','Alle'],['live','Nur echte Kurse'],...Object.entries(CATS)],filt,'filt');
   let h='',lc='';
   for(const x of INS){if(filt==='live'?!M[x.s].live:(filt!=='alle'&&x.c!==filt))continue;
     if((filt==='alle'||filt==='live')&&x.c!==lc){h+=`<div class="cat">${CATS[x.c]}</div>`;lc=x.c}
-    h+=`<button class="row" data-act="pick" data-v="${x.s}"><span><b>${x.s} <span id="ms${x.i}"></span></b><small>${x.n}</small></span><svg class="spark" viewBox="0 0 64 24" aria-hidden="true"><polyline id="sp${x.i}" points=""/></svg><span class="px"><b id="mp${x.i}"></b><small id="mc${x.i}"></small></span></button>`}
+    h+=`<button class="row" data-act="pick" data-v="${x.s}">${ico(x.s)}<span><b>${x.s} <span id="ms${x.i}"></span></b><small>${x.n}</small></span><svg class="spark" viewBox="0 0 56 24" aria-hidden="true"><polyline id="sp${x.i}" points=""/></svg><span class="px"><b id="mp${x.i}"></b><small id="mc${x.i}"></small></span></button>`}
   $('#mrows').innerHTML=h||'<div class="empty">Keine Märkte in dieser Auswahl.</div>';liveMarkets()}
 function liveMarkets(){if(mBuilt!==mVer)return buildMarkets();
   for(const x of INS){const e=$('#mp'+x.i);if(!e)continue;const m=M[x.s],ch=dayCh(x.s),c=m.c;
-  e.textContent=known(x.s)?fp(x.s,m.last):'…';const mc=$('#mc'+x.i);mc.textContent=pct(ch);mc.className=cls(ch);
-  const tg=$('#ms'+x.i),t=stTag(x.s);if(tg.dataset.h!==t){tg.innerHTML=t;tg.dataset.h=t}
-  const sp=$('#sp'+x.i),pts=[];for(let i=Math.max(0,c.length-120);i<c.length;i+=4)pts.push(c[i][4]);
-  if(pts.length<3){sp.setAttribute('points','');continue}const lo=Math.min(...pts),hi=Math.max(...pts),r=hi-lo||1;
-  sp.setAttribute('points',pts.map((p,i)=>(i*64/(pts.length-1)).toFixed(1)+','+(22-(p-lo)/r*20).toFixed(1)).join(' '));
-  sp.style.stroke=pts[pts.length-1]>=pts[0]?'var(--up)':'var(--dn)'}
+    e.textContent=known(x.s)?fp(x.s,m.last):'…';const mc=$('#mc'+x.i);mc.textContent=pct(ch);mc.className=cls(ch);
+    setH($('#ms'+x.i),stTag(x.s));
+    const sp=$('#sp'+x.i),pts=[];for(let i=Math.max(0,c.length-120);i<c.length;i+=4)pts.push(c[i][4]);
+    if(pts.length<3){sp.setAttribute('points','');continue}const lo=Math.min(...pts),hi=Math.max(...pts),r=hi-lo||1;
+    sp.setAttribute('points',pts.map((p,i)=>(i*56/(pts.length-1)).toFixed(1)+','+(22-(p-lo)/r*20).toFixed(1)).join(' '));
+    sp.style.stroke=pts[pts.length-1]>=pts[0]?'var(--up)':'var(--dn)'}
   srcStatus()}
 function buildSrc(){const n=INS.filter(x=>!x.bn).length;
   $('#srcBox').innerHTML=`<div class="srcrow"><b>Krypto und EUR/USD</b><span id="srcBn"></span><p>Echte Kurse in Echtzeit von der Börse Binance, ohne Anmeldung. Gehandelt werden dort die Paare gegen den Dollar-Stablecoin USDT. Der Kurs weicht deshalb minimal vom offiziellen Dollarkurs ab.</p></div>
@@ -241,95 +292,104 @@ function buildSrc(){const n=INS.filter(x=>!x.bn).length;
   <div class="keyrow"><input id="fhKey" placeholder="Finnhub-Schlüssel" autocomplete="off" autocapitalize="off" spellcheck="false" value="${FHKEY.replace(/"/g,'')}"><button class="btn pri" data-act="fhSave">Speichern</button>${FHKEY?'<button class="btn" data-act="fhDel">Entfernen</button>':''}</div>
   <p>Der Schlüssel bleibt nur auf diesem Gerät. Ein Markt wechselt auf „Live“, sobald sein erster echter Kurs eintrifft. Außerhalb der Handelszeiten (Wochenende, nachts bei Aktien) kommt kein Kurs.</p></div>`;srcStatus()}
 function srcStatus(){const b=$('#srcBn');if(!b)return;const dot=(ok,t)=>`<i class="st ${ok?'on':'wait'}">${t}</i>`;
-  let h=dot(bnUp,bnUp?'Verbunden':'Verbinde …');if(b.dataset.h!==h){b.innerHTML=h;b.dataset.h=h}
-  const f=$('#srcFh'),fl=INS.filter(x=>!x.bn&&M[x.s].live).length,ft=INS.filter(x=>!x.bn).length;
-  h=!FHKEY?'<i class="st simu">Simuliert</i>':fhUp?dot(true,fl+' von '+ft+' mit echtem Kurs'):`<i class="st wait">${fhErr||'Verbinde …'}</i>`;
-  if(f.dataset.h!==h){f.innerHTML=h;f.dataset.h=h}}
-function buildTrade(){
-  $('#selIns').innerHTML=Object.entries(CATS).map(([c,t])=>`<optgroup label="${t}">${INS.filter(x=>x.c===c).map(x=>`<option value="${x.s}"${x.s===sel?' selected':''}>${x.s}${M[x.s].live?'':' (simuliert)'}</option>`).join('')}</optgroup>`).join('');
-  $('#tools').innerHTML=[[1,'1 Min'],[5,'5 Min'],[15,'15 Min'],[60,'1 Std']].map(([v,t])=>`<button class="chip sm" data-act="tf" data-v="${v}" aria-pressed="${v===TF}">${t}</button>`).join('')+'<span class="sep"></span>'+
-    [['ema','EMA 9/21'],['bb','Bollinger'],['rsi','RSI']].map(([v,t])=>`<button class="chip sm" data-act="ind" data-v="${v}" aria-pressed="${!!ind[v]}">${t}</button>`).join('')+'<span class="sep"></span>'+
-    `<button class="chip sm" data-act="zoom" data-v="1.4" aria-label="Herauszoomen">−</button><button class="chip sm" data-act="zoom" data-v="0.7" aria-label="Hineinzoomen">+</button>`;
-  $('#speed').innerHTML='<span class="mute" style="align-self:center;font-size:12px;margin-right:2px">Tempo der Simulation</span>'+[[0,'Pause'],[1,'Echtzeit'],[10,'10×'],[60,'60×']].map(([v,t])=>`<button class="chip sm" data-act="speed" data-v="${v}" aria-pressed="${v===speed}">${t}</button>`).join('')}
-let tVer=-1;
-function liveTrade(){if(tVer!==mVer){tVer=mVer;buildTrade()}
-  const ch=dayCh(sel),ok=known(sel);$('#tPx').textContent=ok?fp(sel,M[sel].last):'…';const c=$('#tCh');c.textContent=ch==null?'–':pct(ch)+' · 24 h';c.className=cls(ch);
-  const sr=$('#tSrc'),h=stTag(sel)+' '+srcTxt(sel);if(sr.dataset.h!==h){sr.innerHTML=h;sr.dataset.h=h}
-  $('#speed').hidden=M[sel].live;
-  $('#bBid').textContent=ok?fp(sel,bid(sel)):'–';$('#bAsk').textContent=ok?fp(sel,ask(sel)):'–';
-  const ps=A.pos.filter(p=>p.s===sel),st=$('#posstrip');st.hidden=!ps.length;
-  if(ps.length){const g=ps.reduce((a,p)=>a+pnl(p),0);st.innerHTML=`<span>${ps.length} offene Position${ps.length>1?'en':''} in ${sel}</span><b class="num ${cls(g)}">${sgn(g)} ›</b>`}}
+  setH(b,dot(bnUp,bnUp?'Verbunden':'Verbinde …'));
+  const fl=INS.filter(x=>!x.bn&&M[x.s].live).length,ft=INS.filter(x=>!x.bn).length;
+  setH($('#srcFh'),!FHKEY?'<i class="st simu">Simuliert</i>':fhUp?dot(true,fl+' von '+ft+' mit echtem Kurs'):`<i class="st wait">${fhErr||'Verbinde …'}</i>`)}
+
+/* ---------- Depot ---------- */
 const simTag=l=>l?'':'<span class="tag m">Simuliert</span>';
-let pVer=-1;
+const arrow=s=>s>0?'<span class="up">▲</span> Kauf':'<span class="dn">▼</span> Verkauf';
+let pVer=-1,ptab='over',resetCap=1e4;
 function buildPortfolio(){pVer=ver;
-  $('#pPos').innerHTML=A.pos.length?A.pos.map(p=>`<div class="item"><div><span class="t">${p.s}</span><span class="tag ${p.side>0?'l':'s'}">${p.side>0?'Long':'Short'} ${p.lev}×</span>${simTag(p.live)}
-    <div class="d">Einstieg ${fp(p.s,p.entry)} · Einsatz ${eur(p.margin)}</div><div class="d">SL ${p.sl?fp(p.s,p.sl):'–'} · TP ${p.tp?fp(p.s,p.tp):'–'}</div></div>
-    <div style="text-align:right"><div class="p" id="pl${p.id}"></div><button class="btn" data-act="close" data-v="${p.id}" style="margin-top:6px">Schließen</button></div></div>`).join(''):'<div class="empty">Keine offenen Positionen. Öffne im Tab „Handel“ deinen ersten Trade.</div>';
-  $('#pOrd').innerHTML=A.ord.length?A.ord.map(o=>`<div class="item"><div><span class="t">${o.s}</span><span class="tag ${o.side>0?'l':'s'}">${o.side>0?'Kauf':'Verkauf'}-${o.kind==='limit'?'Limit':'Stop'}</span>${simTag(M[o.s].live)}
-    <div class="d">bei ${fp(o.s,o.price)} · Einsatz ${eur(o.amt)} · ${o.lev}×</div></div><button class="btn" data-act="cancel" data-v="${o.id}">Löschen</button></div>`).join(''):'<div class="empty">Keine wartenden Orders.</div>';
-  const H=A.hist,w=H.filter(h=>h.pnl>0),l=H.filter(h=>h.pnl<=0),sw=w.reduce((a,h)=>a+h.pnl,0),sl=-l.reduce((a,h)=>a+h.pnl,0),ns=H.filter(h=>!h.live).length;
+  $$('#ptabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ptab));
+  $('#pOver').hidden=ptab!=='over';$('#pOpenL').hidden=ptab!=='open';$('#pClosedL').hidden=ptab!=='closed';
+  $('#pOpenL').innerHTML=(A.pos.length?A.pos.map(p=>`<div class="trow"><button class="tmain" data-act="pick" data-v="${p.s}">${ico(p.s)}<span><b>${p.s}${simTag(p.live)}</b><small>${arrow(p.side)} @ ${fp(p.s,p.entry)} · X${p.lev} · ${eur0(p.margin)}</small></span></button>
+    <span class="tr"><b id="pl${p.id}"></b><small id="pp${p.id}"></small></span>
+    <div class="acts"><small class="mute" style="margin-right:auto;font-size:12px">SL ${p.sl?fp(p.s,p.sl):'–'} · TP ${p.tp?fp(p.s,p.tp):'–'}</small><button class="btn sm" data-act="pick" data-v="${p.s}">Zum Chart</button><button class="btn sm danger" data-act="close" data-v="${p.id}">Schließen</button></div></div>`).join('')
+    :'<div class="empty">Keine offenen Trades. Öffne im Tab „Handel“ deinen ersten Trade.</div>')+
+    (A.ord.length?'<h3>Wartende Orders</h3>'+A.ord.map(o=>`<div class="trow"><button class="tmain" data-act="pick" data-v="${o.s}">${ico(o.s)}<span><b>${o.s}${simTag(M[o.s].live)}</b><small>${arrow(o.side)}-${o.kind==='limit'?'Limit':'Stop'} @ ${fp(o.s,o.price)} · X${o.lev} · ${eur0(o.amt)}</small></span></button><button class="btn sm" data-act="cancel" data-v="${o.id}">Löschen</button></div>`).join(''):'');
+  const H=A.hist;
+  $('#pClosedL').innerHTML=H.length?H.slice(0,60).map(h=>{const pc=(h.exit/h.entry-1)*h.side*h.lev*100;
+    return`<div class="trow"><button class="tmain" data-act="pick" data-v="${h.s}">${ico(h.s)}<span><b>${h.s}${simTag(h.live)}</b><small>${arrow(h.side)} @ ${fp(h.s,h.entry)} · ${h.why}</small></span></button><span class="tr"><b class="${cls(h.pnl)}">${sgn(h.pnl)}</b><small>${pct(pc)}</small></span></div>`}).join('')
+    :'<div class="empty">Noch keine geschlossenen Trades.</div>';
+  const w=H.filter(h=>h.pnl>0),l=H.filter(h=>h.pnl<=0),sw=w.reduce((a,h)=>a+h.pnl,0),sl=-l.reduce((a,h)=>a+h.pnl,0),ns=H.filter(h=>!h.live).length;
   let st=`<div class="grid2"><div><small>Trades</small><b>${H.length}</b></div><div><small>Trefferquote</small><b>${H.length?nf(w.length/H.length*100,0)+' %':'–'}</b></div>
     <div><small>Ø Gewinn</small><b class="up">${w.length?eur(sw/w.length):'–'}</b></div><div><small>Ø Verlust</small><b class="dn">${l.length?eur(-sl/l.length):'–'}</b></div>
     <div><small>Profit-Faktor</small><b>${sl>0?nf(sw/sl,2):'–'}</b></div><div><small>Realisiert</small><b class="${cls(sw-sl)}">${sgn(sw-sl)}</b></div></div>`;
   if(ns)st+=`<div class="mute" style="font-size:12px;margin-top:6px">${ns} von ${H.length} Trades liefen auf simulierten Märkten.</div>`;
   if(H.length>1){const pts=[A.start];for(let i=H.length-1;i>=0;i--)pts.push(pts[pts.length-1]+H[i].pnl);const lo=Math.min(...pts),hi=Math.max(...pts),r=hi-lo||1;
-    st+=`<svg class="curve" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Kontoverlauf nach abgeschlossenen Trades"><polyline fill="none" stroke="var(--acc)" stroke-width="1.6" vector-effect="non-scaling-stroke" points="${pts.map((p,i)=>(i*300/(pts.length-1)).toFixed(1)+','+(92-(p-lo)/r*84).toFixed(1)).join(' ')}"/></svg>
-    <div class="mute" style="font-size:12px;margin-top:4px">Kontoverlauf nach jedem abgeschlossenen Trade (${eur(lo)} bis ${eur(hi)})</div>`}
-  $('#pStat').innerHTML=st;
-  $('#pHist').innerHTML=H.length?H.slice(0,40).map(h=>`<div class="item"><div><span class="t">${h.s}</span><span class="tag ${h.side>0?'l':'s'}">${h.side>0?'Long':'Short'} ${h.lev}×</span>${simTag(h.live)}
-    <div class="d">${fp(h.s,h.entry)} → ${fp(h.s,h.exit)} · ${h.why}</div></div><div class="p ${cls(h.pnl)}">${sgn(h.pnl)}</div></div>`).join(''):'<div class="empty">Noch keine abgeschlossenen Trades.</div>';
-  resetUI(false);livePortfolio()}
-let resetCap=1e4;
-function resetUI(ask){$('#resetbox').innerHTML=ask?`<span>Alle Positionen, Orders und den Verlauf löschen?</span><button class="btn danger" data-act="resetYes">Ja, neu starten</button><button class="btn" data-act="resetNo">Abbrechen</button>`
+    st+=`<svg class="curve" viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Kontoverlauf nach geschlossenen Trades"><polyline fill="none" stroke="var(--acc)" stroke-width="1.6" vector-effect="non-scaling-stroke" points="${pts.map((p,i)=>(i*300/(pts.length-1)).toFixed(1)+','+(92-(p-lo)/r*84).toFixed(1)).join(' ')}"/></svg>
+    <div class="mute" style="font-size:12px;margin-top:4px">Kontoverlauf nach jedem geschlossenen Trade (${eur(lo)} bis ${eur(hi)})</div>`}
+  $('#pStat').innerHTML=st;resetUI(false);livePortfolio()}
+function resetUI(ask){$('#resetbox').innerHTML=ask?`<span>Alle Trades, Orders und den Verlauf löschen?</span><button class="btn danger" data-act="resetYes">Ja, neu starten</button><button class="btn" data-act="resetNo">Abbrechen</button>`
   :`<label for="cap" class="mute">Startkapital</label><select id="cap"><option value="1000">1.000 €</option><option value="10000" selected>10.000 €</option><option value="100000">100.000 €</option></select><button class="btn danger" data-act="resetAsk">Konto zurücksetzen</button>`}
 function livePortfolio(){if(pVer!==ver)return buildPortfolio();const a=acct(),tot=a.eq-A.start;
   $('#pEq').textContent=eur(a.eq);const t=$('#pTot');t.textContent=sgn(tot)+' ('+pct(tot/A.start*100)+')';t.className='num '+cls(tot);
   $('#pFree').textContent=eur(a.free);$('#pUsed').textContent=eur(a.used);const o=$('#pOpen');o.textContent=sgn(a.open);o.className=cls(a.open);
   $('#pLvl').textContent=a.used?nf(a.eq/a.used*100,0)+' %':'–';
-  for(const p of A.pos){const e=$('#pl'+p.id);if(e){const g=pnl(p);e.textContent=sgn(g);e.className='p '+cls(g)}}}
+  for(const p of A.pos){const e=$('#pl'+p.id);if(e){const g=pnl(p);e.textContent=sgn(g);e.className=cls(g);$('#pp'+p.id).textContent=pct(g/p.margin*100)}}}
 
-/* ---------- Order-Ticket ---------- */
-let T={side:1,type:'market',lev:1};
-const LEVS=[1,2,5,10,20,30],NOPX='Für diesen Markt liegt gerade kein aktueller Kurs vor (Markt geschlossen oder Verbindung getrennt).';
+/* ---------- Trade eröffnen ---------- */
+let T={side:1,type:'market',lev:1},sheet='';
+const AMTS=[100,500,1000,5000],LEVS=[1,2,5,10,20,30],NOPX='Für diesen Markt liegt gerade kein aktueller Kurs vor (Markt geschlossen oder Verbindung getrennt).';
+function showSheet(s){sheet=s;$('#scrim').hidden=!s;$('#shTicket').hidden=s!=='ticket';$('#shStops').hidden=s!=='stops'}
 function openTicket(side){if(status(sel)==='wait')return toast(NOPX);
-  T={side,type:'market',lev:Math.min(I[sel].lev,5)};const a=acct();
-  $('#tkAmt').value=inp(Math.max(0,Math.floor(a.free*.05)),0);$('#tkSL').value='';$('#tkTP').value='';$('#tkPrice').value=inp(M[sel].last,I[sel].d);$('#tkErr').textContent='';
-  chips($('#tkAmtQ'),[[1,'1 %','sm'],[2,'2 %','sm'],[5,'5 %','sm'],[10,'10 %','sm'],[25,'25 %','sm']],-1,'amtq');
+  const a=acct(),tk=A.tk||{},ls=LEVS.filter(l=>l<=I[sel].lev);
+  T={side,type:'market',lev:ls.filter(l=>l<=(tk.lev||1)).pop()||1};
+  let amt=tk.amt||500;if(amt>a.free)amt=Math.max(0,Math.floor(a.free));
+  $('#tkAmt').value=inp(amt,amt%1?2:0);$('#tkSL').value='';$('#tkTP').value='';$('#tkPrice').value=inp(M[sel].last,I[sel].d);$('#tkErr').textContent='';$('#tkMore').open=false;
   chips($('#tkSLQ'),[[1,'1 ATR','sm'],[2,'2 ATR','sm'],[0,'kein','sm']],-1,'slq');chips($('#tkTPQ'),[[2,'2 ATR','sm'],[4,'4 ATR','sm'],[0,'kein','sm']],-1,'tpq');
-  $('#scrim').hidden=false;ticketUI()}
+  showSheet('ticket');ticketBuild()}
 function ticketVals(){const ins=I[sel],mk=T.type==='market',px=T.side>0?ask(sel):bid(sel),entry=mk?px:parse($('#tkPrice').value);
   const amt=parse($('#tkAmt').value),slv=$('#tkSL').value.trim(),tpv=$('#tkTP').value.trim(),sl=slv?parse(slv):0,tp=tpv?parse(tpv):0,f=fx(ins.q);
   const units=amt*T.lev/(entry*f),risk=sl?Math.abs(entry-sl)*units*f:null,rew=tp?Math.abs(tp-entry)*units*f:null;
   const kind=mk?'market':(T.side>0?(entry<px?'limit':'stop'):(entry>px?'limit':'stop'));
   return{ins,mk,px,entry,amt,sl,tp,f,units,risk,rew,kind}}
-function ticketUI(){const v=ticketVals(),a=acct();
-  $('#tkTitle').textContent=sel+' handeln';$('#tkSrc').innerHTML=stTag(sel)+' '+srcTxt(sel);
-  $$('#tkSide button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===T.side));
-  $$('#tkType button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===T.type));
-  $('#tkPriceF').hidden=v.mk;$('#tkKind').textContent=v.mk?'':(v.kind==='limit'?'Limit-Order':'Stop-Order')+' · aktuell '+fp(sel,v.px);
-  $('#tkFree').textContent='verfügbar '+eur(a.free);$('#tkLevMax').textContent='max. '+v.ins.lev+'× für '+CATS[v.ins.c];
-  chips($('#tkLev'),LEVS.filter(l=>l<=v.ins.lev).map(l=>[l,l+'×']),T.lev,'lev');
-  const ok=isFinite(v.units)&&v.units>0,eqp=v.risk!=null&&a.eq>0?v.risk/a.eq*100:null;
-  $('#tkSum').innerHTML=`<span>Kurs</span><span>${isFinite(v.entry)?fp(sel,v.entry):'–'}</span>
-   <span>Positionswert</span><span>${ok?eur(v.amt*T.lev):'–'}</span>
-   <span>Menge</span><span>${ok?nf(v.units,v.units<100?4:2):'–'}</span>
-   <span>Spread-Kosten</span><span>${ok?eur(v.units*M[sel].last*v.ins.sp*v.f):'–'}</span>
+function ticketBuild(){const v=ticketVals(),a=acct(); // Knöpfe: nur nach einer Eingabe neu aufbauen
+  $('#tkTitle').textContent=sel+(T.side>0?' kaufen':' verkaufen');$('#tkSrc').innerHTML=stTag(sel)+' '+srcTxt(sel);
+  $('#tkAmtQ').innerHTML=AMTS.map(x=>`<button data-act="amtq" data-v="${x}" aria-pressed="${x===v.amt}"${x>a.free?' disabled':''}>${nf(x,0)} €</button>`).join('');
+  $('#tkLev').innerHTML=LEVS.filter(l=>l<=v.ins.lev).map(l=>`<button data-act="lev" data-v="${l}" aria-pressed="${l===T.lev}">X${l}</button>`).join('');
+  $('#tkLevMax').textContent='max. X'+v.ins.lev+' für '+CATS[v.ins.c];
+  $$('#tkType button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===T.type));$('#tkPriceF').hidden=v.mk;
+  const go=$('#tkGo');go.style.background=T.side>0?'var(--up)':'var(--dn)';
+  go.textContent=v.mk?'Trade eröffnen':(T.side>0?'Kauf-Order':'Verkaufs-Order')+' platzieren';ticketLive()}
+function ticketLive(){const v=ticketVals(),a=acct(),ok=isFinite(v.units)&&v.units>0,eqp=v.risk!=null&&a.eq>0?v.risk/a.eq*100:null;
+  $('#tkFree').textContent='verfügbar '+eur(a.free);
+  $('#tkKind').textContent=v.mk?'':(v.kind==='limit'?'Limit-Order':'Stop-Order')+' · aktuell '+fp(sel,v.px);
+  $('#tkLine').textContent=ok?'Kurs '+fp(sel,v.entry)+' · Positionswert '+eur0(v.amt*T.lev)+' · Spread-Kosten '+eur(v.units*M[sel].last*v.ins.sp*v.f):'';
+  $('#tkSum').innerHTML=`<span>Menge</span><span>${ok?nf(v.units,v.units<100?4:2):'–'}</span>
    <span>Risiko bis Stop-Loss</span><span class="${eqp>2?'dn':''}">${v.risk!=null&&ok?eur(v.risk)+' ('+nf(eqp,2)+' % vom Konto)':'ohne Stop unbegrenzt'}</span>
    <span>Chance bis Take-Profit</span><span>${v.rew!=null&&ok?eur(v.rew):'–'}</span>
-   <span>Chance-Risiko-Verhältnis</span><span>${v.risk&&v.rew&&ok?'1 : '+nf(v.rew/v.risk,1):'–'}</span>`;
-  const go=$('#tkGo');go.style.background=T.side>0?'var(--up)':'var(--dn)';
-  go.textContent=(v.mk?(T.side>0?'Long eröffnen':'Short eröffnen'):(T.side>0?'Kauf-Order':'Verkaufs-Order')+' platzieren')}
+   <span>Chance-Risiko-Verhältnis</span><span>${v.risk&&v.rew&&ok?'1 : '+nf(v.rew/v.risk,1):'–'}</span>`}
 function submit(){const v=ticketVals(),a=acct(),E=t=>{$('#tkErr').textContent=t};
   if(status(sel)==='wait')return E(NOPX);
+  if(v.mk&&posOf(sel).length)return E('In diesem Markt ist bereits ein Trade offen. Schließe ihn zuerst.');
   if(!(v.entry>0))return E('Bitte einen gültigen Einstiegskurs eingeben.');
-  if(!(v.amt>=1))return E('Der Einsatz muss mindestens 1 € betragen.');
-  if(v.amt>a.free)return E('Zu wenig freie Margin. Verfügbar: '+eur(a.free)+'.');
+  if(!(v.amt>=1))return E('Der Betrag muss mindestens 1 € sein.');
+  if(v.amt>a.free)return E('Zu wenig freies Guthaben. Verfügbar: '+eur(a.free)+'.');
   if(v.sl&&!(v.sl>0)||v.tp&&!(v.tp>0))return E('Stop-Loss und Take-Profit müssen Kurse sein, z. B. '+inp(v.entry,v.ins.d)+'.');
-  if(v.sl&&(T.side>0?v.sl>=v.entry:v.sl<=v.entry))return E(T.side>0?'Bei Long muss der Stop-Loss unter dem Einstiegskurs liegen.':'Bei Short muss der Stop-Loss über dem Einstiegskurs liegen.');
-  if(v.tp&&(T.side>0?v.tp<=v.entry:v.tp>=v.entry))return E(T.side>0?'Bei Long muss der Take-Profit über dem Einstiegskurs liegen.':'Bei Short muss der Take-Profit unter dem Einstiegskurs liegen.');
-  if(v.mk){openPos(sel,T.side,v.amt,T.lev,v.entry,v.sl||0,v.tp||0);toast(sel+' '+(T.side>0?'Long':'Short')+' eröffnet zu '+fp(sel,v.entry))}
+  if(v.sl&&(T.side>0?v.sl>=v.entry:v.sl<=v.entry))return E(T.side>0?'Beim Kauf muss der Stop-Loss unter dem Einstiegskurs liegen.':'Beim Verkauf muss der Stop-Loss über dem Einstiegskurs liegen.');
+  if(v.tp&&(T.side>0?v.tp<=v.entry:v.tp>=v.entry))return E(T.side>0?'Beim Kauf muss der Take-Profit über dem Einstiegskurs liegen.':'Beim Verkauf muss der Take-Profit unter dem Einstiegskurs liegen.');
+  A.tk={amt:v.amt,lev:T.lev};
+  if(v.mk){openPos(sel,T.side,v.amt,T.lev,v.entry,v.sl||0,v.tp||0);toast(sel+(T.side>0?' gekauft zu ':' verkauft zu ')+fp(sel,v.entry))}
   else{A.ord.push({id:A.id++,s:sel,side:T.side,price:v.entry,kind:v.kind,amt:v.amt,lev:T.lev,sl:v.sl||0,tp:v.tp||0});ver++;save();toast(sel+': '+(v.kind==='limit'?'Limit':'Stop')+'-Order platziert bei '+fp(sel,v.entry))}
-  $('#scrim').hidden=true;draw()}
+  showSheet('');off=0;liveTrade();draw()}
+
+/* ---------- Stops für offene Trades ---------- */
+function openStops(){const ps=posOf(sel);if(!ps.length)return;const p=ps[0],d=I[sel].d;
+  $('#stTitle').textContent='Stops für '+sel;$('#stSL').value=p.sl?inp(p.sl,d):'';$('#stTP').value=p.tp?inp(p.tp,d):'';$('#stErr').textContent='';
+  chips($('#stSLQ'),[[1,'1 ATR','sm'],[2,'2 ATR','sm'],[0,'kein','sm']],-1,'stq');chips($('#stTPQ'),[[2,'2 ATR','sm'],[4,'4 ATR','sm'],[0,'kein','sm']],-1,'ttq');
+  showSheet('stops');stopsLive()}
+function stopsLive(){const ps=posOf(sel);if(!ps.length)return showSheet('');const p=ps[0],slv=$('#stSL').value.trim(),tpv=$('#stTP').value.trim(),sl=slv?parse(slv):0,tp=tpv?parse(tpv):0;
+  const at=x=>ps.reduce((a,q)=>a+pnl(q,x),0);
+  $('#stNow').textContent=(p.side>0?'Kauf':'Verkauf')+' @ '+fp(sel,p.entry)+' · aktueller Kurs '+fp(sel,exitPx(p))+' · '+sgn(sumPl(ps));
+  $('#stSum').innerHTML=`<span>Ergebnis am Stop-Loss</span><span class="${sl>0?cls(at(sl)):''}">${sl>0?sgn(at(sl)):'kein Stop gesetzt'}</span><span>Ergebnis am Take-Profit</span><span class="${tp>0?cls(at(tp)):''}">${tp>0?sgn(at(tp)):'kein Ziel gesetzt'}</span>`}
+function saveStops(){const ps=posOf(sel);if(!ps.length)return showSheet('');const p=ps[0],px=exitPx(p),E=t=>{$('#stErr').textContent=t};
+  const slv=$('#stSL').value.trim(),tpv=$('#stTP').value.trim(),sl=slv?parse(slv):0,tp=tpv?parse(tpv):0;
+  if(slv&&!(sl>0)||tpv&&!(tp>0))return E('Bitte Kurse eingeben, z. B. '+inp(px,I[sel].d)+'.');
+  if(sl&&(p.side>0?sl>=px:sl<=px))return E(p.side>0?'Der Stop-Loss muss unter dem aktuellen Kurs liegen.':'Der Stop-Loss muss über dem aktuellen Kurs liegen.');
+  if(tp&&(p.side>0?tp<=px:tp>=px))return E(p.side>0?'Der Take-Profit muss über dem aktuellen Kurs liegen.':'Der Take-Profit muss unter dem aktuellen Kurs liegen.');
+  ps.forEach(q=>{q.sl=sl;q.tp=tp});ver++;save();showSheet('');draw();toast(sl||tp?'Stops gespeichert':'Stops entfernt')}
 
 /* ---------- Lektionen ---------- */
 const L=window.LESSONS||[];
@@ -339,54 +399,62 @@ function learnProg(){const n=L.filter(l=>A.learn[l[0]]).length;$('#lProg').textC
 /* ---------- Steuerung ---------- */
 function setTab(t){tab=t;['markets','trade','portfolio','learn'].forEach(v=>$('#v-'+v).hidden=v!==t);
   $$('#nav button').forEach(b=>b.dataset.v===t?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));
-  $('main').scrollTop=0;if(t==='trade'){liveTrade();requestAnimationFrame(draw)}if(t==='portfolio')buildPortfolio();if(t==='markets')liveMarkets()}
-function pick(s){sel=s;off=0;cross=null;$('#selIns').value=s;save()}
+  $('main').scrollTop=0;if(t==='trade'){sKey='';liveTrade();requestAnimationFrame(draw)}if(t==='portfolio')buildPortfolio();if(t==='markets')liveMarkets()}
+function pick(s){sel=s;off=0;cross=null;if(tool==='set')buildTools();save()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const v=b.dataset.v;
   switch(b.dataset.act){
    case'tab':setTab(v);break;
+   case'ptab':ptab=v;buildPortfolio();$('main').scrollTop=0;break;
    case'filt':filt=v;buildMarkets();break;
-   case'pick':pick(v);setTab('trade');break;
-   case'tf':TF=+v;off=0;cross=null;buildTrade();draw();save();break;
-   case'ind':ind[v]=!ind[v];buildTrade();draw();save();break;
+   case'pick':pick(v);if(tab==='trade'){liveTrade();draw()}else setTab('trade');break;
+   case'tool':tool=tool===v?'':v;buildTools();draw();break;
+   case'tf':TF=+v;off=0;cross=null;tool='';buildTools();liveTrade();draw();save();break;
+   case'ind':ind[v]=!ind[v];buildTools();draw();save();break;
    case'zoom':zoom=Math.max(20,Math.min(200,Math.round(zoom*+v)));draw();break;
-   case'speed':speed=+v;buildTrade();break;
+   case'speed':speed=+v;buildTools();break;
    case'live':off=0;cross=null;draw();break;
    case'ticket':openTicket(+v);break;
-   case'closeTicket':$('#scrim').hidden=true;break;
-   case'amtq':$('#tkAmt').value=inp(Math.max(0,Math.floor(acct().free*v/100)),0);ticketUI();break;
-   case'lev':T.lev=+v;ticketUI();break;
+   case'closeSheet':showSheet('');break;
+   case'amtq':$('#tkAmt').value=inp(+v,0);$('#tkErr').textContent='';ticketBuild();break;
+   case'lev':T.lev=+v;ticketBuild();break;
    case'slq':case'tpq':{const t=ticketVals(),a=atr(sel),isSL=b.dataset.act==='slq',dir=isSL?-T.side:T.side;
-     $(isSL?'#tkSL':'#tkTP').value=+v&&isFinite(t.entry)?inp(t.entry+dir*a*v,t.ins.d):'';ticketUI();break}
+     $(isSL?'#tkSL':'#tkTP').value=+v&&isFinite(t.entry)?inp(t.entry+dir*a*v,t.ins.d):'';ticketLive();break}
+   case'stq':case'ttq':{const p=posOf(sel)[0];if(!p)break;const a=atr(sel),isSL=b.dataset.act==='stq',dir=isSL?-p.side:p.side;
+     $(isSL?'#stSL':'#stTP').value=+v?inp(exitPx(p)+dir*a*v,I[sel].d):'';$('#stErr').textContent='';stopsLive();break}
    case'submit':submit();break;
+   case'stops':openStops();break;
+   case'saveStops':saveStops();break;
+   case'closeSel':{if(status(sel)==='wait'){toast(NOPX);break}const ps=posOf(sel);ps.forEach(p=>closePos(p,'manuell'));liveTrade();draw();break}
    case'close':{const p=A.pos.find(p=>p.id===+v);if(p){if(status(p.s)==='wait'){toast(NOPX);break}closePos(p,'manuell')}buildPortfolio();break}
-   case'cancel':A.ord=A.ord.filter(o=>o.id!==+v);ver++;save();buildPortfolio();break;
+   case'cancel':A.ord=A.ord.filter(o=>o.id!==+v);ver++;save();if(tab==='portfolio')buildPortfolio();else{liveTrade();draw()}break;
    case'resetAsk':resetCap=+$('#cap').value;resetUI(true);break;
    case'resetNo':resetUI(false);break;
    case'resetYes':A.bal=A.start=resetCap;A.pos=[];A.ord=[];A.hist=[];ver++;save();buildPortfolio();toast('Neues Konto mit '+eur(resetCap)+' gestartet');break;
    case'fhSave':{const k=$('#fhKey').value.trim();if(!k){toast('Bitte zuerst den Schlüssel einfügen.');break}
      try{localStorage.setItem(KEY+'.fh',k)}catch(_){}FHKEY=k;fhErr='';fhTry=0;if(fhWs)try{fhWs.close()}catch(_){}fhWs=null;fhUp=false;fhStart();buildSrc();toast('Schlüssel gespeichert. Verbinde mit Finnhub …');break}
    case'fhDel':try{localStorage.removeItem(KEY+'.fh');localStorage.removeItem(KEY+'.lc')}catch(_){}
-     for(const x of INS)if(!x.bn&&M[x.s].live){for(const p of A.pos.filter(p=>p.s===x.s))closePos(p,'Datenquelle entfernt');A.ord=A.ord.filter(o=>o.s!==x.s);delete A.last[x.s]}
+     for(const x of INS)if(!x.bn&&M[x.s].live){for(const p of posOf(x.s))closePos(p,'Datenquelle entfernt');A.ord=A.ord.filter(o=>o.s!==x.s);delete A.last[x.s]}
      A.seen={};FHKEY='';INS.forEach(x=>{if(!x.bn)M[x.s].ready=false});save();location.reload();break;
    case'quiz':{const [i,j]=v.split(':').map(Number),l=L[i],box=b.parentElement,ok=j===l[5];b.classList.add(ok?'ok':'no');
      if(ok){const w=box.querySelector('.why');w.textContent=l[6];w.hidden=false;A.learn[l[0]]=1;$('#les-'+l[0]).classList.add('done');learnProg();save()}break}
   }});
-$('#selIns').addEventListener('change',e=>{pick(e.target.value);liveTrade();draw()});
-$('#tkSide').addEventListener('click',e=>{const b=e.target.closest('button');if(b){T.side=+b.dataset.v;$('#tkSL').value='';$('#tkTP').value='';ticketUI()}});
-$('#tkType').addEventListener('click',e=>{const b=e.target.closest('button');if(b){T.type=b.dataset.v;if(T.type==='pending')$('#tkPrice').value=inp(M[sel].last,I[sel].d);ticketUI()}});
-['tkAmt','tkSL','tkTP','tkPrice'].forEach(id=>$('#'+id).addEventListener('input',()=>{$('#tkErr').textContent='';ticketUI()}));
-$('#scrim').addEventListener('click',e=>{if(e.target.id==='scrim')$('#scrim').hidden=true});
+$('#tkType').addEventListener('click',e=>{const b=e.target.closest('button');if(b){T.type=b.dataset.v;if(T.type==='pending')$('#tkPrice').value=inp(M[sel].last,I[sel].d);ticketBuild()}});
+$('#tkAmt').addEventListener('input',()=>{$('#tkErr').textContent='';const v=parse($('#tkAmt').value);$$('#tkAmtQ button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===v));ticketLive()});
+['tkSL','tkTP','tkPrice'].forEach(id=>$('#'+id).addEventListener('input',()=>{$('#tkErr').textContent='';ticketLive()}));
+['stSL','stTP'].forEach(id=>$('#'+id).addEventListener('input',()=>{$('#stErr').textContent='';stopsLive()}));
+$('#scrim').addEventListener('click',e=>{if(e.target.id==='scrim')showSheet('')});
 window.addEventListener('resize',()=>tab==='trade'&&draw());
 
 function head(){$('#hEq').textContent=eur(acct().eq);let l=0,s=0,w=0;for(const x of INS){const st=status(x.s);st==='live'?l++:st==='sim'?s++:w++}
-  $('#hStat').textContent=l+' live'+(s?' · '+s+' simuliert':'')+(w?' · '+w+' warten':'')}
-buildMarkets();buildSrc();buildTrade();buildLearn();setTab('markets');head();
+  $('#hStat').textContent='Virtuelles Konto · '+l+' Märkte live'+(s?' · '+s+' simuliert':'')+(w?' · '+w+' warten':'')}
+buildMarkets();buildSrc();buildTools();buildLearn();setTab('trade');head();
 bnStart();fhStart();
 let n=0;
 setInterval(()=>{tick();checkOrders();n++;
-  if(tab==='trade'){draw();if(n%2===0)liveTrade();if(!$('#scrim').hidden&&n%4===0&&T.type==='market')ticketUI()}
+  if(tab==='trade'){draw();if(n%2===0)liveTrade();if(n%4===0){if(sheet==='ticket')ticketLive();if(sheet==='stops')stopsLive()}}
   if(n%2===0){head();if(tab==='portfolio')livePortfolio()}
   if(tab==='markets'&&n%4===0)liveMarkets();
   if(n%40===0)save();if(n%240===0)saveLC()},250);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){save();saveLC()}else{bnStart();fhStart()}});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>tab==='trade'&&draw());
 })();
